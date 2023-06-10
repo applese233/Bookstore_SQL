@@ -5,8 +5,8 @@ from fe.test.gen_book_data import GenBook
 from fe.access.new_buyer import register_new_buyer
 from fe.access.book import Book
 
-from be.model.collection import Collection
 from be.model.user import getBalance
+from be.model.database import getDbSession, New_order
 
 import uuid
 
@@ -64,8 +64,9 @@ class TestCancelOrder:
         curDateTime = datetime.now()
         code, order_id = self.buyer.new_order(self.store_id, buy_book_id_list)
         assert code == 200
-        orderCollection = Collection ("new_order").collection
-        orderCollection.update_one ({"order_id": order_id}, {"$set": {"order_time": curDateTime - timedelta (minutes=15)}})
+        session = getDbSession()
+        session.query(New_order).filter(New_order.order_id == order_id).update({New_order.order_time: curDateTime - timedelta(minutes = 15)})
+        session.commit()
         code = self.buyer.cancel_order (order_id)
         assert code == 521
 
@@ -85,7 +86,8 @@ class TestCancelOrder:
         curDateTime = datetime.now()
         code, order_id = self.buyer.new_order(self.store_id, buy_book_id_list)
         assert code == 200
-        orderCollection = Collection ("new_order").collection
-        orderCollection.update_one ({"order_id": order_id}, {"$set": {"order_time": curDateTime - timedelta (minutes=15)}})
+        session = getDbSession()
+        session.query(New_order).filter(New_order.order_id == order_id).update({New_order.order_time: curDateTime - timedelta(minutes = 15)})
+        session.commit()
         code = self.buyer.payment (order_id)
         assert code == 521

@@ -1,55 +1,97 @@
-import pymongo
+from sqlalchemy.orm import sessionmaker, session, declarative_base
+from sqlalchemy import create_engine, Column, Text, Integer, DateTime, Boolean
 
 class Database:
     def __init__ (self):
-        self.client = pymongo.MongoClient("mongodb://localhost:27017/")
-        self.database = self.client["bookstore"]
+        self.engine = create_engine("postgresql://postgres:20020318@127.0.0.1:5432/bookstore", pool_size = 8, pool_recycle = 60 * 30)
+        self.Dbsession = sessionmaker(bind = self.engine)
+        self.session = self.Dbsession()
+        self.base = declarative_base()
     
-    def getDatabaseClient(self) -> pymongo.MongoClient:
-        return self.client
+    def getEngine(self):
+        return self.engine
 
-    def getDatabase(self) -> pymongo.database.Database:
-        return self.database
+    def getSession(self):
+        return self.session
 
-database_instance: Database = None
+    def getBase(self):
+        return self.base
+
+    def __del__(self):
+        self.session.close()
+
+database_instance: Database = Database()
+
+def getDatabaseBase():
+    global database_instance
+    return database_instance.getBase()
+
+def getDbSession() -> session:
+    global database_instance
+    return database_instance.getSession()
+
+Base = getDatabaseBase()
 
 def init_database():
     global database_instance
-    database_instance = Database()
+    engine = database_instance.getEngine()
+    database_instance.getBase().metadata.create_all(engine)
+    
+class User_store(Base):
+    __tablename__ = "user_store"
 
-def getDatabase () -> pymongo.database.Database:
-    global database_instance
-    return database_instance.getDatabase()
+    user_id = Column(Text, primary_key = True, nullable = False)
+    store_id = Column(Text, primary_key = True, nullable = False)
+
+class Store(Base):
+    __tablename__ = "store"
+
+    store_id = Column(Text, primary_key = True, nullable = False)
+    book_id = Column(Text, primary_key = True, nullable = False)
+    book_info = Column(Text, nullable = False)
+    stock_level = Column(Integer, nullable = False)
+
+class New_order(Base):
+    __tablename__ = "new_order"
+
+    order_id = Column(Text, primary_key = True, unique = True, nullable = False)
+    user_id = Column(Text, nullable = False)
+    store_id = Column(Text, nullable = False)
+    order_time = Column(DateTime, nullable = False)
+    total_price = Column(Integer, nullable = False)
+    paid = Column(Boolean, nullable = False)
+    cancelled = Column(Boolean, nullable = False)
+    delivered = Column(Boolean, nullable = False)
+
+class New_order_detail(Base):
+    __tablename__ = "new_order_detail"
+
+    order_id = Column(Text, primary_key = True, nullable = False)
+    book_id = Column(Text, primary_key = True, nullable = False)
+    count = Column(Integer, nullable = False)
+    price = Column(Integer, nullable = False)
+
+    def Formulate(self):
+        return {"order_id": self.order_id, "book_id": self.book_id, "count": self.count, "price": self.price}
 
 def user_id_exist(user_id) -> bool:
-    user_collection = getDatabase()['user']
-    # cursor = self.conn.execute("SELECT user_id FROM user WHERE user_id = ?;", (user_id,))
-    # row = cursor.fetchone()
-    result = user_collection.find ({'user_id': user_id})
-    result_list = list (result)
-    if len (result_list) == 0:
+    from be.model.user import User
+    result = getDbSession().query(User).filter(User.user_id == user_id).all()
+    if len(result) == 0:
         return False
     else:
         return True
     
 def book_id_exist(store_id, book_id):
-    # cursor = self.conn.execute("SELECT book_id FROM store WHERE store_id = ? AND book_id = ?;", (store_id, book_id))
-    # row = cursor.fetchone()
-    store_collection = getDatabase()['store']
-    result = store_collection.find ({'store_id': store_id, 'book_id': book_id})
-    result_list = list (result)
-    if len (result_list) == 0:
+    result = getDbSession().query(Store).filter(Store.store_id == store_id, Store.book_id == book_id).all()
+    if len(result) == 0:
         return False
     else:
         return True
 
 def store_id_exist(store_id):
-    # cursor = self.conn.execute("SELECT store_id FROM user_store WHERE store_id = ?;", (store_id,))
-    # row = cursor.fetchone()
-    user_store_collection = getDatabase()['user_store']
-    result = user_store_collection.find ({'store_id': store_id})
-    result_list = list (result)
-    if len (result_list) == 0:
+    result = getDbSession().query(User_store).filter(User_store.store_id == store_id).all()
+    if len(result) == 0:
         return False
     else:
         return True
